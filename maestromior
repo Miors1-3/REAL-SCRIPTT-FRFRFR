@@ -1,0 +1,559 @@
+local ScreenGui = Instance.new("ScreenGui")
+ScreenGui.Name = "MainGui"
+ScreenGui.ResetOnSpawn = false
+ScreenGui.Parent = game.Players.LocalPlayer:WaitForChild("PlayerGui")
+
+local MainFrame = Instance.new("Frame")
+MainFrame.Size = UDim2.new(0, 250, 0, 610)
+MainFrame.Position = UDim2.new(1, -MainFrame.Size.X.Offset - 10, 0, 10)
+MainFrame.BackgroundTransparency = 0.5
+MainFrame.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+MainFrame.Active = true
+MainFrame.Draggable = false
+MainFrame.Parent = ScreenGui
+
+local UICornerMain = Instance.new("UICorner")
+UICornerMain.CornerRadius = UDim.new(0.03, 0)
+UICornerMain.Parent = MainFrame
+
+local TitleBar = Instance.new("Frame")
+TitleBar.Size = UDim2.new(1, 0, 0, 20)
+TitleBar.Position = UDim2.new(0, 0, 0, 0)
+TitleBar.BackgroundColor3 = Color3.fromRGB(63, 63, 63)
+TitleBar.Parent = MainFrame
+TitleBar.Active = true
+
+local TitleText = Instance.new("TextLabel")
+TitleText.Size = UDim2.new(1, 0, 1, 0)
+TitleText.Position = UDim2.new(0, 0, 0, 0)
+TitleText.BackgroundTransparency = 1
+TitleText.TextColor3 = Color3.fromRGB(255, 255, 255)
+TitleText.Text = "THA BRONX 2/3"
+TitleText.TextSize = 14
+TitleText.Font = Enum.Font.SourceSans
+TitleText.TextXAlignment = Enum.TextXAlignment.Center
+TitleText.TextYAlignment = Enum.TextYAlignment.Center
+TitleText.Parent = TitleBar
+
+local UICornerTitle = Instance.new("UICorner")
+UICornerTitle.CornerRadius = UDim.new(0.1, 0)
+UICornerTitle.Parent = TitleBar
+
+local MinimizeButton = Instance.new("TextButton")
+MinimizeButton.Size = UDim2.new(0, 10, 0, 10)
+MinimizeButton.Position = UDim2.new(0, 10, 0, 4)
+MinimizeButton.BackgroundColor3 = Color3.fromRGB(244, 191, 79)
+MinimizeButton.Text = ""
+MinimizeButton.BorderSizePixel = 0
+MinimizeButton.Parent = TitleBar
+
+local UICornerMinimize = Instance.new("UICorner")
+UICornerMinimize.CornerRadius = UDim.new(1, 0)
+UICornerMinimize.Parent = MinimizeButton
+
+local ExpandButton = Instance.new("TextButton")
+ExpandButton.Size = UDim2.new(0, 10, 0, 10)
+ExpandButton.Position = UDim2.new(0, 25, 0, 4)
+ExpandButton.BackgroundColor3 = Color3.fromRGB(51, 51, 51)
+ExpandButton.Text = ""
+ExpandButton.BorderSizePixel = 0
+ExpandButton.Parent = TitleBar
+
+local UICornerExpand = Instance.new("UICorner")
+UICornerExpand.CornerRadius = UDim.new(1, 0)
+UICornerExpand.Parent = ExpandButton
+
+local ContentFrame = Instance.new("Frame")
+ContentFrame.Size = UDim2.new(1, 0, 1, -20)
+ContentFrame.Position = UDim2.new(0, 0, 0, 20)
+ContentFrame.BackgroundTransparency = 1
+ContentFrame.Parent = MainFrame
+ContentFrame.Active = false
+
+local function createSectionTitle(text, positionY)
+    local sectionTitle = Instance.new("TextLabel")
+    sectionTitle.Size = UDim2.new(1, -20, 0, 30)
+    sectionTitle.Position = positionY
+    sectionTitle.BackgroundTransparency = 1
+    sectionTitle.TextColor3 = Color3.new(1, 1, 1)
+    sectionTitle.Font = Enum.Font.SourceSans
+    sectionTitle.TextSize = 14
+    sectionTitle.TextXAlignment = Enum.TextXAlignment.Left
+    sectionTitle.Text = "    " .. text
+    sectionTitle.Parent = ContentFrame
+end
+
+
+----------------------------
+
+
+local espEnabled = false 
+
+local playerInfoEnabled = false
+local playerInfoPresent = {}
+local playerConnections = {}
+
+local flying = false
+local bodyVelocity
+local bodyGyro
+local flyConnection
+local speed = 100
+
+local walkSpeed = 7
+local isLoopingWalkSpeed = false
+
+-- 
+
+local function createChams(player)
+    
+    if player == game.Players.LocalPlayer then return end
+    
+    if player.Character then
+        local character = player.Character
+        local humanoid = character:FindFirstChild("Humanoid")
+
+        if humanoid and not character:FindFirstChild("Highlight") then
+            local highlight = Instance.new("Highlight")
+            highlight.Name = "Highlight"
+            highlight.Adornee = character
+            highlight.FillColor = Color3.fromRGB(255, 255, 255)
+            highlight.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
+            highlight.Parent = character
+
+            humanoid.Died:Connect(function()
+                highlight.FillColor = Color3.fromRGB(255, 0, 0)
+            end)
+        end
+    end
+end
+local function updateESPChams()
+    game:GetService("RunService").Heartbeat:Connect(function()
+        if espEnabled then
+            for _, player in pairs(game.Players:GetPlayers()) do
+                if player.Character then
+                    createChams(player)
+                end
+            end
+        end
+    end)
+end
+
+-- 
+
+local function clearPlayerData()
+    for player, billboard in pairs(playerInfoPresent) do
+        if billboard then billboard:Destroy() end
+    end
+    for player, connections in pairs(playerConnections) do
+        for _, connection in ipairs(connections) do
+            connection:Disconnect()
+        end
+    end
+    playerInfoPresent = {}
+    playerConnections = {}
+end
+
+local function updatePlayerInfo()
+    if not playerInfoEnabled then 
+        clearPlayerData()
+        return 
+    end
+
+    for _, player in pairs(game.Players:GetPlayers()) do
+        local character = player.Character
+        if character and not playerInfoPresent[player] then
+            local humanoid = character:FindFirstChild("Humanoid")
+            local head = character:FindFirstChild("Head")
+            if humanoid and head then
+                local billboard = Instance.new("BillboardGui")
+                billboard.Adornee = head
+                billboard.Size = UDim2.new(0, 200, 0, 30)
+                billboard.StudsOffset = Vector3.new(0, 2, 0)
+                billboard.Parent = character
+
+                local label = Instance.new("TextLabel")
+                label.Size = UDim2.new(1, 0, 1, 0)
+                label.TextColor3 = Color3.new(1, 1, 1)
+                label.BackgroundTransparency = 1
+                label.TextSize = 14
+                label.Parent = billboard
+
+                playerInfoPresent[player] = billboard
+                playerConnections[player] = {}
+
+                local function updateLabel()
+                    local localHead = game.Players.LocalPlayer.Character and game.Players.LocalPlayer.Character:FindFirstChild("Head")
+                    if localHead then
+                        local distance = (head.Position - localHead.Position).Magnitude
+                        label.Text = string.format("%s | %dHP | %dm", player.Name, math.round(humanoid.Health), math.round(distance))
+                    end
+                end
+
+                updateLabel()
+
+                table.insert(playerConnections[player], humanoid.HealthChanged:Connect(updateLabel))
+                table.insert(playerConnections[player], game:GetService("RunService").Heartbeat:Connect(updateLabel))
+            end
+        end
+    end
+end
+
+game:GetService("RunService").Heartbeat:Connect(updatePlayerInfo)
+
+-- 
+
+local function fly()
+    local player = game.Players.LocalPlayer
+    local character = player.Character or player.CharacterAdded:Wait()
+    local humanoidRootPart = character:WaitForChild("HumanoidRootPart")
+    
+    bodyVelocity = Instance.new("BodyVelocity")
+    bodyVelocity.MaxForce = Vector3.new(9e9, 9e9, 9e9)
+    bodyVelocity.Velocity = Vector3.new(0, 0, 0)
+    bodyVelocity.Parent = humanoidRootPart
+    
+    bodyGyro = Instance.new("BodyGyro")
+    bodyGyro.MaxTorque = Vector3.new(9e9, 9e9, 9e9)
+    bodyGyro.CFrame = humanoidRootPart.CFrame
+    bodyGyro.Parent = humanoidRootPart
+    
+    flyConnection = game:GetService("RunService").Heartbeat:Connect(function()
+        local camera = workspace.CurrentCamera
+        local moveDirection = Vector3.new(0, 0, 0)
+        
+        if game:GetService("UserInputService"):IsKeyDown(Enum.KeyCode.W) then
+            moveDirection = moveDirection + (camera.CFrame.LookVector * speed)
+        end
+        if game:GetService("UserInputService"):IsKeyDown(Enum.KeyCode.S) then
+            moveDirection = moveDirection - (camera.CFrame.LookVector * speed)
+        end
+        
+        if game:GetService("UserInputService"):IsKeyDown(Enum.KeyCode.A) then
+            moveDirection = moveDirection - (camera.CFrame.RightVector * speed)
+        end
+        if game:GetService("UserInputService"):IsKeyDown(Enum.KeyCode.D) then
+            moveDirection = moveDirection + (camera.CFrame.RightVector * speed)
+        end
+        
+        if game:GetService("UserInputService"):IsKeyDown(Enum.KeyCode.Space) then
+            moveDirection = moveDirection + Vector3.new(0, speed, 0)  -- Upwards
+        end
+        if game:GetService("UserInputService"):IsKeyDown(Enum.KeyCode.LeftControl) then
+            moveDirection = moveDirection - Vector3.new(0, speed, 0)  -- Downwards
+        end
+
+        bodyVelocity.Velocity = moveDirection
+
+        bodyGyro.CFrame = camera.CFrame
+    end)
+end
+
+local function toggleFly()
+    flying = not flying
+
+    if flying then
+        fly()
+    else
+        -- Disable flight by disconnecting the event and removing BodyVelocity and BodyGyro
+        if flyConnection then flyConnection:Disconnect() end
+        if bodyVelocity then bodyVelocity:Destroy() end
+        if bodyGyro then bodyGyro:Destroy() end
+        local humanoidRootPart = game.Players.LocalPlayer.Character:WaitForChild("HumanoidRootPart")
+        humanoidRootPart.Velocity = Vector3.new(0, 0, 0) -- Stop the movement
+    end
+end
+
+-- 
+
+local function teleportTo(x, y, z) 
+    local player = game.Players.LocalPlayer
+    local character = player.Character or player.CharacterAdded:Wait()
+    local humanoidRootPart = character:WaitForChild("HumanoidRootPart")
+    
+    humanoidRootPart.CFrame = CFrame.new(Vector3.new(x, y, z))
+end
+
+----------------------------
+
+
+local function createSwitch(parent, position, size, switchNumber)
+    local switch = Instance.new("TextButton")
+    switch.Size = size
+    switch.Position = position
+    switch.BackgroundColor3 = Color3.fromRGB(200, 200, 200)
+    switch.BorderSizePixel = 0
+    switch.Text = ""
+    switch.Parent = parent
+
+    local knob = Instance.new("Frame")
+    knob.Size = UDim2.new(0, 16, 0, 16)
+    knob.Position = UDim2.new(0, 2, 0, 2)
+    knob.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+    knob.BorderSizePixel = 0
+    knob.Parent = switch
+
+    local UICornerSwitch = Instance.new("UICorner")
+    UICornerSwitch.CornerRadius = UDim.new(0.5, 0)
+    UICornerSwitch.Parent = switch
+
+    local UICornerKnob = Instance.new("UICorner")
+    UICornerKnob.CornerRadius = UDim.new(0.5, 0)
+    UICornerKnob.Parent = knob
+
+    local switchState = false
+
+    local function toggleSwitch()
+        switchState = not switchState
+
+        local tweenService = game:GetService("TweenService")
+
+        local backgroundTweenInfo = TweenInfo.new(0.5, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
+        local knobTweenInfo = TweenInfo.new(0.5, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
+
+        local backgroundTweenGoal = switchState and {BackgroundColor3 = Color3.fromRGB(0, 255, 0)} or {BackgroundColor3 = Color3.fromRGB(200, 200, 200)}
+        local backgroundTween = tweenService:Create(switch, backgroundTweenInfo, backgroundTweenGoal)
+
+        local knobTweenGoal = switchState and {Position = UDim2.new(0, 22, 0, 2)} or {Position = UDim2.new(0, 2, 0, 2)}
+        local knobTween = tweenService:Create(knob, knobTweenInfo, knobTweenGoal)
+
+        backgroundTween:Play()
+        knobTween:Play()
+
+        if switchNumber == 1 then
+            if switchState then
+                espEnabled = true
+                updateESPChams()
+            else
+                espEnabled = false
+                for _, player in pairs(game.Players:GetPlayers()) do
+                    if player.Character then
+                        local highlight = player.Character:FindFirstChild("Highlight")
+                        if highlight then
+                            highlight:Destroy()
+                        end
+                    end
+                end
+            end
+        elseif switchNumber == 2 then
+            playerInfoEnabled = not playerInfoEnabled
+            print("Player Info Enabled: " .. tostring(playerInfoEnabled))
+            if not playerInfoEnabled then
+                clearPlayerData()
+            end
+        elseif switchNumber == 3 then
+            toggleFly()
+        end
+    end
+    switch.MouseButton1Click:Connect(toggleSwitch)
+end
+
+-- 
+
+local function createButton(parent, position, size, buttonText)
+
+    local button = Instance.new("TextButton")
+    button.Size = size
+    button.Position = position
+    button.BackgroundColor3 = Color3.fromRGB(51, 51, 51)
+    button.BorderSizePixel = 0  -- No outline
+    button.Text = buttonText
+    button.TextColor3 = Color3.fromRGB(255, 255, 255)
+    button.Font = Enum.Font.SourceSans
+    button.TextSize = 14
+    button.Parent = parent
+
+    local UICornerButton = Instance.new("UICorner")
+    UICornerButton.CornerRadius = UDim.new(0.2, 0)
+    UICornerButton.Parent = button
+
+    button.MouseButton1Click:Connect(function()
+        if buttonText == "Gunshop" then
+            teleportTo(92967, 122098, 17024)
+        elseif buttonText == "Dealership" then
+            teleportTo(-421, 253, -1252)
+        elseif buttonText == "Penthouse" then
+            teleportTo(-149, 417, -598) 
+        elseif buttonText == "Tha Shop" then
+            teleportTo(-1524, 274, -984)
+        elseif buttonText == "Laundry" then
+            teleportTo(-989, 254, -673)
+        elseif buttonText == "Bank" then
+            teleportTo(-244, 284, -1215) 
+        elseif buttonText == "Ice-Fruit Truck" then
+            teleportTo(-59, 287, -338) 
+        elseif buttonText == "Chicken & Wings" then
+            teleportTo(-962, 254, -823)
+        elseif buttonText == "Rooftop Market" then
+            teleportTo(-383, 340, -556)
+        elseif buttonText == "Backpackz" then
+            teleportTo(-674, 254, -685)
+        elseif buttonText == "Full bright" then
+            game.Lighting.Brightness = 2
+            game.Lighting.OutdoorAmbient = Color3.fromRGB(255, 255, 255)
+            game.Lighting.Ambient = Color3.fromRGB(255, 255, 255)
+            game.Lighting.FogColor = Color3.fromRGB(255, 255, 255)
+            game.Lighting.GlobalShadows = false
+        elseif buttonText == "Inject Inf Yield" then
+            loadstring(game:HttpGet("https://raw.githubusercontent.com/EdgeIY/infiniteyield/master/source"))()
+        elseif buttonText == "Rejoin" then
+            game:GetService("TeleportService"):TeleportToPlaceInstance(game.PlaceId, game.JobId, game:GetService("Players").LocalPlayer)
+        end
+    end)
+end
+
+-- 
+
+local function createSlider(parent, position, size, sliderNumber)
+    local slider = Instance.new("Frame")
+    slider.Size = UDim2.new(0, size.X.Offset, 0, 4)
+    slider.Position = position
+    slider.BackgroundColor3 = Color3.fromRGB(200, 200, 200)
+    slider.BorderSizePixel = 0
+    slider.Parent = parent
+
+    local UICornerSlider = Instance.new("UICorner")
+    UICornerSlider.CornerRadius = UDim.new(1, 0)
+    UICornerSlider.Parent = slider
+
+    local fillBar = Instance.new("Frame")
+    fillBar.Size = UDim2.new(0, 0, 1, 0)
+    fillBar.BackgroundColor3 = Color3.fromRGB(0, 122, 255)
+    fillBar.BorderSizePixel = 0
+    fillBar.Parent = slider
+
+    local UICornerFill = Instance.new("UICorner")
+    UICornerFill.CornerRadius = UDim.new(1, 0)
+    UICornerFill.Parent = fillBar
+
+    local hitbox = Instance.new("TextButton")
+    hitbox.Size = UDim2.new(0, size.X.Offset, 0, 20)
+    hitbox.Position = UDim2.new(0, 0, 0.5, -10)
+    hitbox.BackgroundTransparency = 1
+    hitbox.Text = ""
+    hitbox.Parent = slider
+
+    local knob = Instance.new("Frame")
+    knob.Size = UDim2.new(0, 16, 0, 16)
+    knob.Position = UDim2.new(0, 0, 0.5, -6)
+    knob.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+    knob.BorderSizePixel = 0
+    knob.Parent = slider
+
+    local UICornerKnob = Instance.new("UICorner")
+    UICornerKnob.CornerRadius = UDim.new(1, 0)
+    UICornerKnob.Parent = knob
+
+    local userInputService = game:GetService("UserInputService")
+    local dragging = false
+
+    local lastWalkSpeed = game.Players.LocalPlayer.Character and game.Players.LocalPlayer.Character.Humanoid.WalkSpeed or 16
+    local lastFOV = game.Workspace.CurrentCamera.FieldOfView
+
+    local function updateSlider(input)
+        local relativePos = math.clamp((input.Position.X - slider.AbsolutePosition.X) / slider.AbsoluteSize.X, 0, 1)
+        knob.Position = UDim2.new(relativePos, -6, 0.5, -6)
+        fillBar.Size = UDim2.new(relativePos, 0, 1, 0)
+
+        local value = math.floor(relativePos * 100)
+
+        if sliderNumber == 1 then
+            if value >= 7 then
+                walkSpeed = math.max(value, 7)
+                if not isLoopingWalkSpeed then
+                    isLoopingWalkSpeed = true
+                end
+            else
+                walkSpeed = 0
+                if isLoopingWalkSpeed then
+                    isLoopingWalkSpeed = false
+                end
+            end
+        end
+    end
+
+    hitbox.InputBegan:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 then
+            dragging = true
+            updateSlider(input)
+        end
+    end)
+
+    hitbox.InputChanged:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseMovement and dragging then
+            updateSlider(input)
+        end
+    end)
+
+    userInputService.InputEnded:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 then
+            dragging = false
+        end
+    end)
+
+    game:GetService("RunService").Heartbeat:Connect(function()
+        if isLoopingWalkSpeed and game.Players.LocalPlayer.Character then
+            local player = game.Players.LocalPlayer
+            local character = player.Character or player.CharacterAdded:Wait()
+            local humanoid = character:FindFirstChildOfClass("Humanoid")
+
+            if humanoid then
+                humanoid.WalkSpeed = walkSpeed
+            end
+        end
+    end)
+end
+
+
+----------------------------
+
+
+createSectionTitle("- Visuals (ESP) -", UDim2.new(0, 0, 0, 0))
+
+createSectionTitle("Player Chams", UDim2.new(0, 0, 0, 25))
+createSwitch(ContentFrame, UDim2.new(0, 80, 0, 31), UDim2.new(0, 40, 0, 20), 1)
+createSectionTitle("Player Info", UDim2.new(0, 0, 0, 55))
+createSwitch(ContentFrame, UDim2.new(0, 80, 0, 59), UDim2.new(0, 40, 0, 20), 2)
+
+createSectionTitle("- Teleports -", UDim2.new(0, 0, 0, 82))
+
+createButton(ContentFrame, UDim2.new(0, 5, 0, 112), UDim2.new(0, 100, 0, 30), "Gunshop")
+createButton(ContentFrame, UDim2.new(0, 110, 0, 112), UDim2.new(0, 100, 0, 30), "Dealership")
+createButton(ContentFrame, UDim2.new(0, 5, 0, 147), UDim2.new(0, 100, 0, 30), "Penthouse")
+createButton(ContentFrame, UDim2.new(0, 110, 0, 147), UDim2.new(0, 100, 0, 30), "Tha Shop")
+createButton(ContentFrame, UDim2.new(0, 5, 0, 182), UDim2.new(0, 100, 0, 30), "Laundry")
+createButton(ContentFrame, UDim2.new(0, 110, 0, 182), UDim2.new(0, 100, 0, 30), "Bank")
+createButton(ContentFrame, UDim2.new(0, 5, 0, 217), UDim2.new(0, 100, 0, 30), "Ice-Fruit Truck")
+createButton(ContentFrame, UDim2.new(0, 110, 0, 217), UDim2.new(0, 100, 0, 30), "Chicken & Wings")
+createButton(ContentFrame, UDim2.new(0, 5, 0, 252), UDim2.new(0, 100, 0, 30), "Rooftop Market")
+createButton(ContentFrame, UDim2.new(0, 110, 0, 252), UDim2.new(0, 100, 0, 30), "Backpackz")
+
+createSectionTitle("- Client Only -", UDim2.new(0, 0, 0, 280))
+createSectionTitle("Fly", UDim2.new(0, 0, 0, 304))
+createSwitch(ContentFrame, UDim2.new(0, 80, 0, 310), UDim2.new(0, 40, 0, 20), 3)
+createSectionTitle("Walk Speed", UDim2.new(0, 0, 0, 328))
+createSlider(ContentFrame, UDim2.new(0, 90, 0, 342), UDim2.new(0, 67, 0, 3), 1)
+createButton(ContentFrame, UDim2.new(0, 5, 0, 361), UDim2.new(0, 100, 0, 30), "Full bright")
+--createButton(ContentFrame, UDim2.new(0, 110, 0, 361), UDim2.new(0, 100, 0, 30), "")
+
+createButton(ContentFrame, UDim2.new(0, 20, 0, 545), UDim2.new(0, 100, 0, 30), "Inject Inf Yield")
+createButton(ContentFrame, UDim2.new(0, 130, 0, 545), UDim2.new(0, 100, 0, 30), "Rejoin")
+
+createSectionTitle("Created by mior n maestroSIGMA", UDim2.new(0, 37, 0, 565))
+
+MinimizeButton.MouseButton1Click:Connect(function()
+    ContentFrame.Visible = false
+    MainFrame.BackgroundTransparency = 1
+    MinimizeButton.BackgroundColor3 = Color3.fromRGB(51, 51, 51)
+    ExpandButton.BackgroundColor3 = Color3.fromRGB(97, 197, 84)
+end)
+
+ExpandButton.MouseButton1Click:Connect(function()
+    ContentFrame.Visible = true
+    MainFrame.BackgroundTransparency = 0.5
+    MinimizeButton.BackgroundColor3 = Color3.fromRGB(244, 191, 79)
+    ExpandButton.BackgroundColor3 = Color3.fromRGB(51, 51, 51)
+end)
+
+RedButton.MouseButton1Click:Connect(function()
+    ScreenGui:Destroy()
+end)
