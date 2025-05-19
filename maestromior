@@ -372,7 +372,7 @@ local function createButton(parent, position, size, buttonText)
         elseif buttonText == "Dealership" then
             teleportTo(-421, 253, -1252)
         elseif buttonText == "Penthouse" then
-            teleportTo(-149, 417, -598) 
+            teleportTo(-131.7, 420, -586) 
         elseif buttonText == "Tha Shop" then
             teleportTo(-1524, 274, -984)
         elseif buttonText == "Laundry" then
